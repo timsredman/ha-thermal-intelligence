@@ -26,7 +26,7 @@ class ThermalEntity(CoordinatorEntity, Entity):
             name=f"Thermal Intelligence {self.zone['name']}",
             manufacturer="Redman Labs",
             model="Thermal zone monitor",
-            sw_version="0.1.3",
+            sw_version="0.1.4",
         )
 
     @property

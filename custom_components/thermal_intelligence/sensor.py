@@ -78,8 +78,12 @@ class ThermalDiagnosticSensor(ThermalEntity, SensorEntity):
     def native_value(self) -> Any:
         value = self.thermal.data[self.zone_id].get(self.metric)
         if self.metric in {"demand", "burner"}:
+            if value is None:
+                return None
             return "on" if value else "off"
         if self.metric == "demand_duration":
+            if self.thermal.data[self.zone_id].get("demand") is None:
+                return None
             active = self.thermal.data[self.zone_id].get("demand_started")
             if active:
                 from homeassistant.util import dt as dt_util

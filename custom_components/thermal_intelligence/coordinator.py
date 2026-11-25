@@ -41,26 +41,45 @@ def _number(state: State | None) -> float | None:
     return value if math.isfinite(value) else None
 
 
-def _entity_is_active(hass: HomeAssistant, entity_id: str, *, demand: bool = False) -> bool:
-    """Interpret a configured HA entity, including climate hvac_action."""
+def _entity_signal_state(hass: HomeAssistant, entity_id: str, *, demand: bool = False) -> bool | None:
+    """Interpret an entity as an active, inactive, or unknown signal."""
     state = hass.states.get(entity_id)
-    if state is None or state.state.lower() in {
-        "off",
-        "false",
-        "0",
-        "idle",
-        "unknown",
-        "unavailable",
-    }:
-        return False
-    action = state.attributes.get("hvac_action")
-    if action is not None:
-        # Climate entities report demand, never verified burner telemetry.
-        return demand and str(action).lower() == "heating"
-    if demand and state.domain == "climate":
+    if state is None or state.state.lower() in {"unknown", "unavailable", "none", ""}:
+        return None
+    if state.domain == "climate":
+        if not demand:
+            # Climate activity cannot verify actual burner telemetry.
+            return None
+        action = state.attributes.get("hvac_action")
+        if action is not None:
+            action_state = str(action).lower()
+            if action_state == "heating":
+                return True
+            if action_state in {"idle", "off"}:
+                return False
+            return None
         # `hvac_mode: heat` is a selected mode, not an active call for heat.
+        return False if state.state.lower() == "off" else None
+    if state.state.lower() in {"off", "false", "0", "idle"}:
         return False
     return True
+
+
+def _aggregate_signal_state(hass: HomeAssistant, entity_ids: list[str], *, demand: bool = False) -> bool | None:
+    """Combine multiple signals without treating missing data as inactive."""
+    if not entity_ids:
+        return None
+    states = [_entity_signal_state(hass, entity_id, demand=demand) for entity_id in entity_ids]
+    if True in states:
+        return True
+    if all(value is False for value in states):
+        return False
+    return None
+
+
+def _entity_is_active(hass: HomeAssistant, entity_id: str, *, demand: bool = False) -> bool:
+    """Return whether a configured HA entity is positively active."""
+    return _entity_signal_state(hass, entity_id, demand=demand) is True
 
 
 def _slug(value: str) -> str:
@@ -103,10 +122,10 @@ class ThermalCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             "retention": None,
             "sensor_disagreement": None,
             "freshness": "unknown",
-            "demand": False,
-            "burner": False,
+            "demand": None,
+            "burner": None,
             "source": "None",
-            "any_source_active": False,
+            "any_source_active": None,
             "last_sample": None,
             "history": deque(maxlen=HISTORY_LIMIT),
             "demand_started": None,
@@ -153,9 +172,9 @@ class ThermalCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             values["demand_accumulated_seconds"] = 0
             self.data[zone_id].update(values)
             self.data[zone_id]["history"] = deque(valid_history, maxlen=HISTORY_LIMIT)
-            self.data[zone_id]["demand"] = False
-            self.data[zone_id]["burner"] = False
-            self.data[zone_id]["any_source_active"] = False
+            self.data[zone_id]["demand"] = None
+            self.data[zone_id]["burner"] = None
+            self.data[zone_id]["any_source_active"] = None
         for zone_id in self.zones:
             self._refresh_zone(zone_id, initial=True)
             self._derive(zone_id)
@@ -231,11 +250,11 @@ class ThermalCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         if slopes:
             rate = max(-10.0, min(10.0, median(slopes)))
             result["rate"] = rate
-            if result["any_source_active"]:
+            if result["any_source_active"] is True:
                 result["heating_rate"] = rate
                 result["cooling_rate"] = None
                 result["retention"] = None
-            else:
+            elif result["any_source_active"] is False:
                 result["cooling_rate"] = rate
                 result["heating_rate"] = None
                 outdoor_entity = self.config.get(CONF_OUTDOOR_SENSOR)
@@ -251,6 +270,10 @@ class ThermalCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     result["retention"] = round((indoor - outdoor) / -rate, 2)
                 else:
                     result["retention"] = None
+            else:
+                result["heating_rate"] = None
+                result["cooling_rate"] = None
+                result["retention"] = None
         elif len(points) < 2:
             result["rate"] = None
             result["heating_rate"] = None
@@ -310,34 +333,44 @@ class ThermalCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             source_burners = source.get("burner_entities", [])
             demand_entities.extend(source_demands)
             burner_entities.extend(source_burners)
-            active_demand_for_source = any(
-                _entity_is_active(self.hass, entity, demand=True) for entity in source_demands
-            )
-            active_burner_for_source = any(_entity_is_active(self.hass, entity) for entity in source_burners)
-            active = active_demand_for_source or active_burner_for_source
+            active_demand_for_source = _aggregate_signal_state(self.hass, source_demands, demand=True)
+            active_burner_for_source = _aggregate_signal_state(self.hass, source_burners)
+            active = active_demand_for_source is True or active_burner_for_source is True
             source_active = source_active or active
             if active:
                 source_name = source.get("name", "Configured source")
-        demand = any(_entity_is_active(self.hass, entity, demand=True) for entity in demand_entities)
-        burner = any(_entity_is_active(self.hass, entity) for entity in burner_entities)
-        active_demand = demand
-        if active_demand and source_name == "None":
+        demand = _aggregate_signal_state(self.hass, demand_entities, demand=True)
+        burner = _aggregate_signal_state(self.hass, burner_entities)
+        active_demand = demand is True
+        if demand is True and source_name == "None":
             source_name = "Configured demand"
-        if burner and source_name == "None":
+        if burner is True and source_name == "None":
             source_name = "Configured burner signal"
-        result["demand"] = active_demand
+        if demand is None and burner is None:
+            source_name = "Not configured"
+        elif source_name == "None" and demand is False and burner is False:
+            source_name = "No active mapped source"
+        elif source_name == "None":
+            source_name = "Source status unknown"
+        result["demand"] = demand
         result["burner"] = burner
-        result["any_source_active"] = source_active or active_demand or burner
+        result["any_source_active"] = (
+            True
+            if source_active or demand is True or burner is True
+            else False
+            if demand is False and burner is False
+            else None
+        )
         result["source"] = source_name
 
         if initial:
             # Start a new interval at setup; never backdate from HA's current state.
             result["demand_started"] = now.isoformat() if active_demand else None
             result["demand_accumulated_seconds"] = 0
-        elif active_demand and not result.get("demand_started"):
+        elif demand is True and not result.get("demand_started"):
             result["demand_started"] = now.isoformat()
             result["demand_accumulated_seconds"] = 0
-        elif not active_demand and result.get("demand_started"):
+        elif demand is False and result.get("demand_started"):
             elapsed = _elapsed_seconds(now, result.get("demand_started"))
             result["last_demand_duration"] = int(result.get("demand_accumulated_seconds", 0)) + elapsed
             result["demand_started"] = None

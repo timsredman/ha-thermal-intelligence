@@ -55,7 +55,7 @@
 ]
 ```
 
-The demand and burner selectors also accept a system-wide set. If actual boiler flame/runtime is not exposed, leave burner entities empty; demand must not be described as burner runtime.
+The demand and burner selectors also accept a system-wide set. If actual boiler flame/runtime is not exposed, leave burner entities empty; its state will show as unknown, not off. Demand and burner are separate observations, and demand must not be described as burner runtime.
 
 ### Configuration form note
 
@@ -63,9 +63,9 @@ The initial form uses HA entity selectors for outdoor, demand and burner entitie
 
 ## Entities
 
-For each zone the integration creates diagnostics for temperature, total/heating/cooling rate, heat retention, sensor disagreement, freshness, age, demand, burner activity, heating source and demand duration, plus stale/disagreement binary sensors. Per-zone entities are grouped under a Thermal Intelligence device. Values may be unknown until valid samples arrive.
+For each zone the integration creates diagnostics for temperature, total/heating/cooling rate, heat retention, sensor disagreement, freshness, age, demand, burner activity, heating source and demand duration, plus stale/disagreement binary sensors. Per-zone entities are grouped under a Thermal Intelligence device. Values may be unknown until valid samples arrive. If either the demand or burner signal is unconfigured or unavailable, its state is unknown; the overall temperature rate remains available, while the heating/cooling split and retention estimate are withheld until both signals are known. Retention also requires a valid outdoor temperature and sufficient temperature history.
 
-Rates use the median of adjacent sample slopes from up to the last six hours, require at least two minutes between samples and are bounded to ±10 °C/h to avoid spikes. Heat retention is an observed apparent time constant, not a building-standard U-value: `hours ≈ (indoor °C − outdoor °C) / cooling °C per hour`. It is only emitted while cooling without observed demand/burner. Solar gain, occupancy, ventilation, doors, cooking, emitters and sensor placement all affect it.
+Rates use the median of adjacent sample slopes from up to the last six hours, require at least two minutes between samples and are bounded to ±10 °C/h to avoid spikes. Heat retention is an observed apparent time constant, not a building-standard U-value: `hours ≈ (indoor °C − outdoor °C) / cooling °C per hour`. It is only emitted while cooling with known inactive demand and burner signals. Solar gain, occupancy, ventilation, doors, cooking, emitters and sensor placement all affect it.
 
 Sensor freshness uses HA state update timestamps; devices whose integrations suppress unchanged reports can appear stale. Stale reference sensors are omitted from disagreement calculations, and retention is withheld when the primary sensor is stale. Staleness is a diagnostic, not proof of a failed sensor. Disagreement compares calibrated primary and available reference sensor states; it does not correct for height or spatial gradients. Offsets are user-supplied and should only be set after calibration.
 
