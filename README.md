@@ -132,4 +132,4 @@ Use Python 3.14.2 or later for local tests. CI runs pytest, Ruff and Home Assist
 
 ## Project
 
-Repository: [timsredman/ha-thermal-intelligence](https://github.com/timsredman/ha-thermal-intelligence). License: MIT. HACS publication still requires adding the integration to `home-assistant/brands`, which HACS lists as a repository requirement. GitHub releases are optional. Until the brand entry is accepted, local manual installation is the available route.
+Repository: [timsredman/ha-thermal-intelligence](https://github.com/timsredman/ha-thermal-intelligence). License: MIT. A repository-local HACS brand icon is included and the HACS validation check passes. Add the repository in HACS as a custom repository to install it; listing in HACS default store is a separate submission. GitHub releases are optional.
