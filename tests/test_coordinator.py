@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 from homeassistant.util import dt as dt_util
 
@@ -64,3 +65,26 @@ async def test_unavailable_primary_is_not_sampled(hass, config_entry, zone_confi
     hass.states.async_set(zone_config["primary_sensor"], "unavailable")
     coordinator._sample(zone_id)
     assert not coordinator.data[zone_id]["history"]
+
+
+async def test_setup_tolerates_null_or_invalid_persisted_timestamps(hass, config_entry, zone_config):
+    coordinator = ThermalCoordinator(hass, config_entry)
+    zone_id = "hall_and_landing"
+    hass.states.async_set(zone_config["primary_sensor"], "21.9")
+    coordinator._store.async_load = AsyncMock(
+        return_value={
+            zone_id: {
+                "last_sample": None,
+                "history": [
+                    {"time": None, "temperature": 20.0},
+                    {"time": "not-a-datetime", "temperature": 21.0},
+                ],
+            }
+        }
+    )
+
+    await coordinator.async_setup()
+
+    assert coordinator.data[zone_id]["last_sample"] is None
+    assert list(coordinator.data[zone_id]["history"]) == []
+    await coordinator.async_shutdown()

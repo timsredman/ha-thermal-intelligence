@@ -68,6 +68,16 @@ def _slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_") or "zone"
 
 
+def _parse_datetime(value: Any) -> datetime | None:
+    """Parse a persisted datetime value, tolerating null or malformed data."""
+    if not isinstance(value, str):
+        return None
+    try:
+        return dt_util.parse_datetime(value)
+    except (TypeError, ValueError):
+        return None
+
+
 class ThermalCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
     """Track configured sensor state with bounded, persisted histories."""
 
@@ -133,11 +143,11 @@ class ThermalCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 item
                 for item in history
                 if isinstance(item, dict)
-                and dt_util.parse_datetime(item.get("time", "")) is not None
+                and _parse_datetime(item.get("time")) is not None
                 and _finite_value(item.get("temperature")) is not None
             ]
             values = {key: value for key, value in restored.items() if key != "history"}
-            values["last_sample"] = dt_util.parse_datetime(values.get("last_sample", ""))
+            values["last_sample"] = _parse_datetime(values.get("last_sample"))
             values["demand_started"] = None
             # Never include server downtime in demand duration after restart.
             values["demand_accumulated_seconds"] = 0
@@ -192,7 +202,7 @@ class ThermalCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         now = dt_util.utcnow()
         history: deque = self.data[zone_id]["history"]
         if history:
-            last_time = dt_util.parse_datetime(history[-1]["time"])
+            last_time = _parse_datetime(history[-1].get("time"))
             if last_time is not None and dt_util.as_utc(last_time) >= dt_util.as_utc(now):
                 return
         history.append({"time": now.isoformat(), "temperature": value})
@@ -205,7 +215,7 @@ class ThermalCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         cutoff = dt_util.utcnow() - timedelta(hours=6)
         points: list[tuple[datetime, float]] = []
         for item in history:
-            stamp = dt_util.parse_datetime(item.get("time", ""))
+            stamp = _parse_datetime(item.get("time"))
             value = _finite_value(item.get("temperature"))
             if stamp is not None and value is not None and dt_util.as_utc(stamp) >= dt_util.as_utc(cutoff):
                 points.append((dt_util.as_utc(stamp), value))
@@ -256,7 +266,7 @@ class ThermalCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         current = _number(primary)
         last_sample = result.get("last_sample")
         if isinstance(last_sample, str):
-            last_sample = dt_util.parse_datetime(last_sample)
+            last_sample = _parse_datetime(last_sample)
             result["last_sample"] = last_sample
         last_reported = self._last_reported.get(zone["primary_sensor"])
         if last_reported is None and primary is not None:
@@ -353,7 +363,7 @@ def _finite_value(value: Any) -> float | None:
 
 
 def _elapsed_seconds(now: datetime, started: Any) -> int:
-    parsed = dt_util.parse_datetime(started) if isinstance(started, str) else started
+    parsed = _parse_datetime(started) if isinstance(started, str) else started
     if not isinstance(parsed, datetime):
         return 0
     return max(0, int((now - dt_util.as_utc(parsed)).total_seconds()))
