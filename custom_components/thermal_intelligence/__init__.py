@@ -9,11 +9,6 @@ from .const import DOMAIN, PLATFORMS
 from .coordinator import ThermalCoordinator
 
 
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up from YAML (not supported)."""
-    return True
-
-
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up a configured thermal monitor."""
     coordinator = ThermalCoordinator(hass, entry)
