@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from datetime import timedelta
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -16,6 +18,16 @@ from custom_components.thermal_intelligence.coordinator import (
     _slug,
 )
 from custom_components.thermal_intelligence.sensor import ThermalDiagnosticSensor
+
+
+def test_custom_integration_translation_file_contains_entity_names():
+    translation_path = (
+        Path(__file__).parents[1] / "custom_components" / "thermal_intelligence" / "translations" / "en.json"
+    )
+    translations = json.loads(translation_path.read_text(encoding="utf-8"))
+
+    assert translations["entity"]["sensor"]["temperature"]["name"] == "Temperature"
+    assert translations["entity"]["sensor"]["heating_demand"]["name"] == "Heating demand"
 
 
 def test_number_rejects_unavailable_and_non_finite():

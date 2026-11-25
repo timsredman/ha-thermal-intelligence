@@ -1,0 +1,60 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Thermal Intelligence",
+        "description": "Configure one or more zones using JSON. Each zone needs a name and primary_sensor entity ID.",
+        "data": {
+          "zones": "Thermal zones (JSON)",
+          "sources": "Named heating source mappings (JSON)",
+          "outdoor_sensor": "Outdoor temperature sensor",
+          "demand_entities": "Heating demand entities",
+          "burner_entities": "Actual burner activity entities"
+        }
+      }
+    },
+    "error": {
+      "invalid_configuration": "Check the JSON and required zone fields."
+    },
+    "abort": {
+      "already_configured": "Thermal Intelligence is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Thermal Intelligence options",
+        "data": {
+          "zones": "Thermal zones (JSON)",
+          "sources": "Named heating source mappings (JSON)",
+          "outdoor_sensor": "Outdoor temperature sensor",
+          "demand_entities": "Heating demand entities",
+          "burner_entities": "Actual burner activity entities"
+        }
+      }
+    },
+    "error": {
+      "invalid_configuration": "Check the JSON and required zone fields."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "temperature": {"name": "Temperature"},
+      "temperature_rate": {"name": "Temperature rate"},
+      "heating_rate": {"name": "Heating rate"},
+      "cooling_rate": {"name": "Cooling rate"},
+      "heat_retention": {"name": "Heat retention estimate"},
+      "sensor_disagreement": {"name": "Sensor disagreement"},
+      "sensor_freshness": {"name": "Sensor freshness"},
+      "sensor_age": {"name": "Sensor age"},
+      "heating_demand": {"name": "Heating demand"},
+      "burner_active": {"name": "Burner active"},
+      "heating_source": {"name": "Heating source"},
+      "demand_duration": {"name": "Demand duration"}
+    },
+    "binary_sensor": {
+      "sensor_stale": {"name": "Sensor stale"},
+      "sensor_disagreement": {"name": "Sensor disagreement"}
+    }
+  }
+}
