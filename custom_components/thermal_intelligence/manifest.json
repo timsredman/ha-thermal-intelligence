@@ -1,11 +1,13 @@
 {
   "domain": "thermal_intelligence",
   "name": "Thermal Intelligence",
-  "codeowners": ["@timsredman"],
+  "codeowners": [
+    "@timsredman"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/timsredman/ha-thermal-intelligence",
   "integration_type": "helper",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/timsredman/ha-thermal-intelligence/issues",
-  "version": "0.1.0"
+  "version": "0.1.1"
 }
