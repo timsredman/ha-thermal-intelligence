@@ -8,12 +8,14 @@ from unittest.mock import AsyncMock
 
 from homeassistant.util import dt as dt_util
 
+from custom_components.thermal_intelligence.binary_sensor import ThermalStatusBinarySensor
 from custom_components.thermal_intelligence.coordinator import (
     ThermalCoordinator,
     _entity_is_active,
     _number,
     _slug,
 )
+from custom_components.thermal_intelligence.sensor import ThermalDiagnosticSensor
 
 
 def test_number_rejects_unavailable_and_non_finite():
@@ -88,3 +90,15 @@ async def test_setup_tolerates_null_or_invalid_persisted_timestamps(hass, config
     assert coordinator.data[zone_id]["last_sample"] is None
     assert list(coordinator.data[zone_id]["history"]) == []
     await coordinator.async_shutdown()
+
+
+async def test_zone_entities_set_unique_ids_without_base_translation_key(hass, config_entry, zone_config):
+    coordinator = ThermalCoordinator(hass, config_entry)
+    zone_id = "hall_and_landing"
+    coordinator.zones = {zone_id: zone_config}
+
+    temperature = ThermalDiagnosticSensor(coordinator, config_entry, zone_id, "temperature", "temperature", None)
+    stale = ThermalStatusBinarySensor(coordinator, config_entry, zone_id, "sensor_stale")
+
+    assert temperature.unique_id == f"{config_entry.entry_id}_{zone_id}_temperature"
+    assert stale.unique_id == f"{config_entry.entry_id}_{zone_id}_sensor_stale"

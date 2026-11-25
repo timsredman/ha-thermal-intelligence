@@ -8,7 +8,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import ThermalCoordinator, _slug
+from .coordinator import ThermalCoordinator
 
 
 class ThermalEntity(CoordinatorEntity, Entity):
@@ -26,9 +26,8 @@ class ThermalEntity(CoordinatorEntity, Entity):
             name=f"Thermal Intelligence {self.zone['name']}",
             manufacturer="Redman Labs",
             model="Thermal zone monitor",
-            sw_version="0.1.0",
+            sw_version="0.1.2",
         )
-        self._attr_unique_id = f"{entry.entry_id}_{zone_id}_{_slug(self._attr_translation_key or 'entity')}"
 
     @property
     def available(self) -> bool:
